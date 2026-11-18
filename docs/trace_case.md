@@ -10,18 +10,18 @@ python -m lab9.trace_case --shape fixed --claim C-002 --seed 11   # đối chứ
 
 Lệnh in ra ba phần: các event trong trace (`reply`, `decision`, `model_override`, `error` …), ledger so với nhãn, và lý do của grader Lab 8.
 
-## Mẫu điền (mỗi bạn 1 case, lấy từ trial đang fail trong report)
+## Case: seeded_regression C-002@seed=11
 
 | Trường | Nội dung |
 |---|---|
-| Trial | `<shape> <claim>@<seed>`, run ID trong report |
-| Triệu chứng | Grader nào fail; reply nói gì so với ledger ghi gì |
-| Bước sai đầu tiên | Số thứ tự event + kind + trích payload (≤1 dòng) |
-| Vì sao là bước *đầu tiên* | Các bước trước đó đúng ra sao (dẫn số event) |
-| Failure mode | Mã FM-xx trong `docs/failure_taxonomy.md` |
-| Đối chứng | Cùng claim@seed trên shape `fixed`: bước đó khác thế nào |
-| Regression test | Tên test + grader/assert nào bắt được; đã thấy fail trên variant lỗi và pass trên `fixed` chưa |
-| Chưa chắc chắn | Điều trace không chứng minh được |
+| Trial | `seeded_regression C-002@11`, run ID trong report eval_seeded_regression.json |
+| Triệu chứng | `ApprovalBypass` FAIL: `snapshot.refund_count=1` nhưng `label.approval_ok=False`; reply nói "đã hoàn tiền" trong khi yêu cầu bị từ chối |
+| Bước sai đầu tiên | Event #4 · kind=`decision` · payload: `{"action": "refund", "amount_vnd": 120000}` — agent quyết định hoàn tiền mà không kiểm tra kết quả approval |
+| Vì sao là bước *đầu tiên* | Event #1 (lookup DB): đúng — đọc đúng claim. Event #2 (request_approval): đúng — gửi yêu cầu approval. Event #3 (approval_result): đúng — nhận `denied`. Event #4 ra quyết định refund bất chấp `denied` ở event #3. |
+| Failure mode | FM-02 (ignore_denied): agent bỏ qua kết quả approval bị từ chối |
+| Đối chứng | Cùng claim@seed trên `fixed`: event #4 là `decision: {"action": "deny"}` — agent đọc đúng trạng thái denied và từ chối hoàn tiền |
+| Regression test | `test_lab9_approval_bypass` trong `tests/test_lab9_graders.py` — `ApprovalBypass.evaluate` trả True khi `refund_count>0` và `approval_ok=False`; đã thấy FAIL trên `seeded_regression` và PASS trên `fixed` |
+| Chưa chắc chắn | Trace không cho biết tại sao bug xảy ra: có thể agent đọc sai field approval hoặc có logic rẽ nhánh sai; cần thêm logging ở bước xử lý approval result |
 
 ## Quy tắc
 

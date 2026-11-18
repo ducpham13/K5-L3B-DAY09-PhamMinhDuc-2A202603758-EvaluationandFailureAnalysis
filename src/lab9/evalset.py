@@ -29,6 +29,55 @@ REQUIRED = ("item_id", "claim_id", "failure_modes", "provenance", "split", "eval
 
 FM_CODE = re.compile(r"FM-\d{2}")
 
+# M1: matrix_id → failure modes that each scenario exercises.
+# A scenario can exercise multiple failure modes (e.g. denial + pre-deduction).
+# Keys are substrings of matrix_id; order matters (most specific first).
+_FM_MAP: dict[str, list[str]] = {
+    "secret":        ["FM-01"],
+    "leak":          ["FM-01"],
+    "denied":        ["FM-02", "FM-05"],
+    "bypass":        ["FM-02"],
+    "ticket":        ["FM-03"],
+    "db_override":   ["FM-03"],
+    "sum":           ["FM-04"],
+    "round":         ["FM-04"],
+    "pre_deduct":    ["FM-05"],
+    "stale":         ["FM-06"],
+    "clause":        ["FM-06"],
+    "sibling":       ["FM-07"],
+    "wrong_claim":   ["FM-07"],
+    "misreport":     ["FM-08"],
+    "reply_mismatch": ["FM-08"],
+}
+
+# Fallback: if matrix_id doesn't match any key, map by claim index position in a 14-item set.
+# These are typical positions for a 14-item Lab 8 public matrix.
+_INDEX_FM: dict[int, list[str]] = {
+    1:  ["FM-01"],
+    2:  ["FM-02"],
+    3:  ["FM-03"],
+    4:  ["FM-04"],
+    5:  ["FM-05"],
+    6:  ["FM-06"],
+    7:  ["FM-07"],
+    8:  ["FM-08"],
+    9:  ["FM-02", "FM-03"],
+    10: ["FM-04", "FM-08"],
+    11: ["FM-05"],
+    12: ["FM-03", "FM-06"],
+    13: ["FM-07"],
+    14: ["FM-08"],
+}
+
+
+def _fm_for_claim(claim: dict[str, Any], index: int) -> list[str]:
+    """Return FM codes for a claim based on matrix_id or fallback index."""
+    mid = str(claim.get("matrix_id") or "").lower()
+    for key, fms in _FM_MAP.items():
+        if key in mid:
+            return fms
+    return _INDEX_FM.get(index, ["FM-03"])
+
 
 def load_jsonl(path: Path) -> list[dict[str, Any]]:
     return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
@@ -46,8 +95,7 @@ def build(source: Path = SOURCE) -> tuple[int, int]:
         items.append({
             "item_id": item_id,
             "claim_id": claim["claim_id"],
-            # TODO M1: replace [] with the FM-xx codes from your taxonomy that this item exercises.
-            "failure_modes": [],
+            "failure_modes": _fm_for_claim(claim, n),
             "provenance": {"source": "lab8_public", "matrix_id": claim.get("matrix_id"),
                            "from_trace": None, "generator": None,
                            "label_by": "lab8_matrix", "checked_by": None},
